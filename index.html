@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Somalia RPG - Object Version</title>
+    <style>
+        body { background: #0f051d; color: #d1c4e9; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .container { width: 100%; max-width: 600px; background: #1e0b36; padding: 25px; border-radius: 15px; border: 2px solid #6200ea; box-shadow: 0 0 15px #6200ea; }
+        .hidden { display: none; }
+        button { background: #4a148c; color: white; border: none; padding: 12px; margin: 5px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #7b1fa2; transform: scale(1.05); }
+        input { padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #7b1fa2; background: #2d1450; color: white; width: calc(100% - 26px); }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #2d1450; padding: 15px; border-radius: 10px; margin: 15px 0; }
+        .log { height: 120px; overflow-y: auto; background: #000; padding: 10px; font-family: monospace; font-size: 13px; border-radius: 5px; color: #00ff00; }
+        .race-card { border: 1px dashed #7b1fa2; padding: 10px; margin-bottom: 10px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align: center; color: #b388ff;">SOMALIA ONLINE</h2>
+
+    <div id="auth-screen">
+        <input type="text" id="username" placeholder="Tên tài khoản...">
+        <input type="password" id="password" placeholder="Mật khẩu...">
+        <button onclick="game.auth('login')" style="width: 100%;">Đăng Nhập</button>
+        <button onclick="game.auth('register')" style="width: 100%; background: #311b92;">Đăng Ký Tài Khoản Mới</button>
+    </div>
+
+    <div id="race-screen" class="hidden">
+        <h3>Lựa chọn huyết thống</h3>
+        <div id="race-list"></div>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div class="stats-grid">
+            <div>👤: <span id="p-user"></span></div>
+            <div>🧬 Tộc: <span id="p-race"></span></div>
+            <div>⭐ Lv: <span id="p-lv"></span></div>
+            <div>💰 Vàng: <span id="p-gold"></span></div>
+            <div>💎 Ngọc: <span id="p-gem"></span></div>
+            <div>❤️ HP: <span id="p-hp"></span></div>
+            <div>⚔️ Dame: <span id="p-atk"></span></div>
+        </div>
+
+        <div style="background: #311b92; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+            <h4>Quái: <span id="m-name">Bộ Xương Khô</span></h4>
+            <button onclick="game.attack()" style="width: 100%; font-weight: bold; background: #d32f2f;">Vung Kiếm Tấn Công</button>
+        </div>
+
+        <div id="shop">
+            <h4>Cửa Hàng Trang Bị</h4>
+            <div id="shop-items"></div>
+        </div>
+
+        <p>Nhật ký:</p>
+        <div id="game-log" class="log"></div>
+        <button onclick="game.logout()" style="margin-top: 15px; background: #455a64;">Thoát Game</button>
+    </div>
+</div>
+
+<script>
+// --- CẤU HÌNH DỮ LIỆU DẠNG OBJECT ---
+
+const RACES = {
+    'Cyborg': {
+        desc: '+20% Dame, +10% Máu, Giảm 15% phản dame',
+        atkMulti: 1.2,
+        hpMulti: 1.1,
+        reflectReduc: 0.15 // Giảm tỉ lệ phản
+    },
+    'Devil': {
+        desc: '+50% Dame, -20% Máu, Phản dame cực cao',
+        atkMulti: 1.5,
+        hpMulti: 0.8,
+        reflectReduc: -0.1 // Tăng thêm phản dame
+    },
+    'Shark': {
+        desc: '+40% Máu, Tỉ lệ phản dame mặc định',
+        atkMulti: 1.0,
+        hpMulti: 1.4,
+        reflectReduc: 0
+    }
+};
+
+const SHOP_ITEMS = [
+    { name: 'Kiếm Gỗ', price: 50, atk: 5, hp: 0 },
+    { name: 'Giáp Da', price: 100, atk: 0, hp: 30 },
+    { name: 'Nhẫn Ngọc', price: 500, atk: 20, hp: 50 }
+];
+
+// --- ĐỐI TƯỢNG GAME CHÍNH ---
+
+const game = {
+    player: null,
+    storageKey: 'SOMALIA_V14_DATA_',
+
+    // 1. Khởi tạo danh sách Tộc và Shop
+    init() {
+        const raceList = document.getElementById('race-list');
+        Object.keys(RACES).forEach(r => {
+            raceList.innerHTML += `
+                <div class="race-card">
+                    <strong>Tộc ${r}</strong><br><small>${RACES[r].desc}</small><br>
+                    <button onclick="game.selectRace('${r}')">Chọn Tộc Này</button>
+                </div>`;
+        });
+
+        const shopDiv = document.getElementById('shop-items');
+        SHOP_ITEMS.forEach((item, index) => {
+            shopDiv.innerHTML += `<button onclick="game.buy(${index})">${item.name} (${item.price} vàng)</button>`;
+        });
+    },
+
+    // 2. Đăng nhập / Đăng ký
+    auth(type) {
+        const u = document.getElementById('username').value;
+        const p = document.getElementById('password').value;
+        if (!u || !p) return alert("Nhập đủ thông tin!");
+
+        const data = localStorage.getItem(this.storageKey + u);
+
+        if (type === 'register') {
+            if (data) return alert("Tài khoản đã có người dùng!");
+            this.player = { user: u, pass: p, lv: 1, exp: 0, gold: 0, gem: 0, race: null, baseAtk: 10, baseHp: 100 };
+            this.save();
+            alert("Đăng ký thành công!");
+        } else {
+            if (!data || JSON.parse(data).pass !== p) return alert("Sai tài khoản/mật khẩu!");
+            this.player = JSON.parse(data);
+            this.render();
+        }
+    },
+
+    // 3. Chọn Tộc
+    selectRace(name) {
+        this.player.race = name;
+        // Áp dụng chỉ số tộc vào chỉ số gốc
+        this.player.baseAtk = Math.floor(this.player.baseAtk * RACES[name].atkMulti);
+        this.player.baseHp = Math.floor(this.player.baseHp * RACES[name].hpMulti);
+        this.save();
+        this.render();
+    },
+
+    // 4. Chiến đấu & Phản dame
+    attack() {
+        const p = this.player;
+        const raceBonus = RACES[p.race];
+        
+        // Tính toán phản dame: 40% mặc định - giảm trừ của tộc
+        const reflectRate = 0.4 - raceBonus.reflectReduc;
+        const reflectDamage = Math.floor(p.baseAtk * reflectRate);
+
+        p.baseHp -= reflectDamage;
+        p.gold += 15;
+        p.exp += 25;
+
+        this.log(`Bạn đánh quái gây ${p.baseAtk} dame. Bị phản ${reflectDamage} máu!`);
+
+        // Check lên cấp
+        if (p.exp >= p.lv * 100) {
+            p.lv++;
+            p.exp = 0;
+            p.gem += 2;
+            this.log(`<span style="color:yellow">Level UP! Bạn đạt cấp ${p.lv}</span>`);
+        }
+
+        if (p.baseHp <= 0) {
+            alert("Bạn đã kiệt sức! Tự hồi phục lại.");
+            p.baseHp = 100;
+        }
+
+        this.save();
+        this.updateStats();
+    },
+
+    // 5. Mua đồ
+    buy(index) {
+        const item = SHOP_ITEMS[index];
+        if (this.player.gold >= item.price) {
+            this.player.gold -= item.price;
+            this.player.baseAtk += item.atk;
+            this.player.baseHp += item.hp;
+            this.log(`Mua thành công ${item.name}!`);
+            this.save();
+            this.updateStats();
+        } else {
+            alert("Không đủ tiền!");
+        }
+    },
+
+    // Hỗ trợ
+    save() { localStorage.setItem(this.storageKey + this.player.user, JSON.stringify(this.player)); },
+    
+    log(msg) {
+        const l = document.getElementById('game-log');
+        l.innerHTML += `> ${msg}<br>`;
+        l.scrollTop = l.scrollHeight;
+    },
+
+    updateStats() {
+        document.getElementById('p-user').innerText = this.player.user;
+        document.getElementById('p-race').innerText = this.player.race;
+        document.getElementById('p-lv').innerText = this.player.lv;
+        document.getElementById('p-gold').innerText = this.player.gold;
+        document.getElementById('p-gem').innerText = this.player.gem;
+        document.getElementById('p-hp').innerText = this.player.baseHp;
+        document.getElementById('p-atk').innerText = this.player.baseAtk;
+    },
+
+    render() {
+        document.getElementById('auth-screen').classList.add('hidden');
+        if (!this.player.race) {
+            document.getElementById('race-screen').classList.remove('hidden');
+        } else {
+            document.getElementById('race-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            this.updateStats();
+        }
+    },
+
+    logout() { location.reload(); }
+};
+
+// Khởi chạy
+game.init();
+</script>
+
+</body>
+</html>
+
