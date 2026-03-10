@@ -2,244 +2,123 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Somalia RPG - Fix Hệ Thống Quái</title>
-    <style>
-        body { background: #0f051d; color: #d1c4e9; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 600px; background: #1e0b36; padding: 25px; border-radius: 15px; border: 2px solid #6200ea; box-shadow: 0 0 20px #6200ea; }
-        .hidden { display: none; }
-        button { background: #4a148c; color: white; border: none; padding: 12px; margin: 5px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #7b1fa2; transform: scale(1.02); }
-        input { padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #7b1fa2; background: #2d1450; color: white; width: calc(100% - 26px); }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #2d1450; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 5px solid #6200ea; }
-        .log { height: 140px; overflow-y: auto; background: #000; padding: 10px; font-family: monospace; font-size: 13px; border-radius: 5px; color: #00ff00; border: 1px solid #444; margin-top: 10px; }
-        .monster-box { background: #311b92; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #ff1744; text-align: center; }
-        .highlight { color: #ffeb3b; font-weight: bold; }
-    </style>
+    <title>Game RPG Somalia</title>
 </head>
 <body>
-
-<div class="container">
-    <h2 style="text-align: center; color: #b388ff;">SOMALIA SYSTEM V14</h2>
-
-    <div id="auth-screen">
-        <input type="text" id="username" placeholder="Tài khoản...">
-        <input type="password" id="password" placeholder="Mật khẩu...">
-        <button onclick="game.auth('login')" style="width: 100%;">Đăng Nhập</button>
-        <button onclick="game.auth('register')" style="width: 100%; background: #311b92;">Đăng Ký</button>
+    <div>
+        <input type="text" id="username" placeholder="Tên đăng nhập">
+        <input type="password" id="password" placeholder="Mật khẩu">
+        <button onclick="game.auth('register')">Đăng ký</button>
+        <button onclick="game.auth('login')">Đăng nhập</button>
     </div>
 
-    <div id="race-screen" class="hidden">
-        <h3>Chọn Tộc</h3>
-        <div id="race-list"></div>
+    <h3>Chọn tộc:</h3>
+    <div id="race-list"></div>
+
+    <h3>Cửa hàng:</h3>
+    <div id="shop-items"></div>
+    
+    <div>
+        <p>Quái: <span id="n-name">Chưa tải</span></p>
+        <p>HP: <span id="n-hp-current">0</span>/<span id="n-hp-max">0</span></p>
     </div>
 
-    <div id="game-screen" class="hidden">
-        <div class="stats-grid">
-            <div>👤: <span id="p-user" class="highlight"></span></div>
-            <div>🧬 Tộc: <span id="p-race"></span></div>
-            <div>⭐ Lv: <span id="p-lv"></span></div>
-            <div>💰 Vàng: <span id="p-gold"></span></div>
-            <div>💎 Ngọc: <span id="p-gem"></span></div>
-            <div>❤️ HP: <span id="p-hp" style="color: #ff5252;"></span></div>
-            <div>⚔️ Dame: <span id="p-atk" style="color: #ffeb3b;"></span></div>
-        </div>
+    <script>
+    // --- DỮ LIỆU ---
+    const RACES = {
+        'Cyborg': { atkMulti: 1.2, hpMulti: 1.1, reflectReduc: 0.15 },
+        'Ma Tộc': { atkMulti: 1.5, hpMulti: 0.8, reflectReduc: -0.1 }
+    };
 
-        <div class="monster-box">
-            <h4 style="margin: 0 0 10px 0;">Mục tiêu: <span id="m-name" style="color: #ff1744;">---</span></h4>
-            <p style="font-size: 18px; font-weight: bold;">HP: <span id="m-hp-current">0</span> / <span id="m-hp-max">0</span></p>
-            <div style="display: flex; gap: 5px;">
-                <button onclick="game.attack()" style="flex: 2; font-weight: bold; background: #d32f2f;">TẤN CÔNG (Phản 40%)</button>
-                <button onclick="game.nextMonster()" style="flex: 1; background: #00897b;">ĐỔI QUÁI</button>
-            </div>
-        </div>
-
-        <div id="shop">
-            <h4 style="margin: 5px 0;">Cửa Hàng</h4>
-            <div id="shop-items" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
-        </div>
-
-        <div id="game-log" class="log"></div>
-        <button onclick="game.logout()" style="margin-top: 15px; background: #455a64; width: 100%;">Thoát</button>
-    </div>
-</div>
-
-<script>
-// --- DỮ LIỆU ---
-
-const RACES = {
-    'Cyborg': { atkMulti: 1.2, hpMulti: 1.1, reflectReduc: 0.15 },
-    'Ma Tộc': { atkMulti: 1.5, hpMulti: 0.8, reflectReduc: -0.1 }
-};
-
-const MONSTERS = [
-    { name: 'Bù Nhìn Rơm', hp: 200, gold: 20, exp: 30 }, // Con đầu tiên 200 máu
-    { name: 'Người Xương', hp: 500, gold: 50, exp: 100 },
-    { name: 'xương cấp cao', hp: 1000, gold: 150 exp: 200 },
-{ name: 'vua xương', hp: 1200, gold: 200, exp: 250 },
-{ name: 'shadow', hp:2500, gold: 500, exp: 1000 },
-{ name: 'king shadow', hp:7200, gold: 1250, exp: 2575 },
+    const MONSTERS = [
+        { name: 'Bù Nhìn Rơm', hp: 200, gold: 20, exp: 30 },
+        { name: 'Người Xương', hp: 500, gold: 50, exp: 100 },
+        { name: 'Xương Cấp Cao', hp: 1000, gold: 150, exp: 200 },
+        { name: 'Vua Xương', hp: 1200, gold: 200, exp: 250 },
+        { name: 'Shadow', hp: 2500, gold: 500, exp: 1000 },
+        { name: 'King Shadow', hp: 7200, gold: 1250, exp: 2575 }
     ];
 
-const SHOP_ITEMS = [
-    { name: 'Kiếm Gỗ', price: 50, atk: 10, hp: 0 },
-    { name: 'Giáp Da', price: 100, hp: 50, atk: 0 },
-    { name: 'kiếm sắt',price: 200,hp: 0,atk: 25 },
-    { name: 'giáp sắt',price: 250,hp:75,atk: 5 },
-    { name: 'kiếm uranium',price: 750,hp:0,atk: 75 },
-    { name: 'áo choàng hoàng gia',price:999,hp:250,atk:25 },
-];
+    const SHOP_ITEMS = [
+        { name: 'Kiếm Gỗ', price: 50, atk: 10, hp: 0 },
+        { name: 'Giáp Da', price: 100, hp: 50, atk: 0 },
+        { name: 'Kiếm Sắt', price: 200, hp: 0, atk: 25 },
+        { name: 'Giáp Sắt', price: 250, hp: 75, atk: 5 },
+        { name: 'Kiếm Uranium', price: 750, hp: 0, atk: 75 },
+        { name: 'Áo Choàng Hoàng Gia', price: 999, hp: 250, atk: 25 }
+    ];
 
-// --- HỆ THỐNG ---
+    // --- HỆ THỐNG ---
+    const game = {
+        player: null,
+        storageKey: 'SOMALIA_V14_DATA_',
+        monsterIdx: 0,
+        currentMonsterHP: 0,
 
-const game = {
-    player: null,
-    storageKey: 'SOMALIA_V14_DATA_',
-    currentMonsterHP: 0,
-    monsterIdx: 0,
+        init() {
+            const rl = document.getElementById('race-list');
+            Object.keys(RACES).forEach(r => {
+                rl.innerHTML += `<button onclick="game.selectRace('${r}')">Tộc ${r}</button>`;
+            });
 
-    init() {
-        const rl = document.getElementById('race-list');
-        Object.keys(RACES).forEach(r => {
-            rl.innerHTML += `<button onclick="game.selectRace('${r}')">Tộc ${r}</button>`;
-        });
+            const si = document.getElementById('shop-items');
+            SHOP_ITEMS.forEach((item, i) => {
+                si.innerHTML += `<button onclick="game.buy(${i})">${item.name} (${item.price}g)</button>`;
+            });
+        },
 
-        const si = document.getElementById('shop-items');
-        SHOP_ITEMS.forEach((item, i) => {
-            si.innerHTML += `<button onclick="game.buy(${i})">${item.name} (${item.price}v)</button>`;
-        });
-    },
+        auth(type) {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if (!u || !p) return alert("Nhập đủ thông tin!");
+            
+            const data = localStorage.getItem(this.storageKey + u);
+            if (type === 'register') {
+                if (data) return alert("Tài khoản đã tồn tại!");
+                this.player = { user: u, pass: p, lv: 1, exp: 0, gold: 100, hp: 100, atk: 10 };
+                this.save();
+                alert("Đăng ký thành công!");
+            } else {
+                if (!data) return alert("Sai thông tin!");
+                this.player = JSON.parse(data);
+                if (this.player.pass !== p) return alert("Sai thông tin!");
+                alert("Đăng nhập thành công!");
+                this.loadMonster();
+            }
+        },
 
-    auth(type) {
-        const u = document.getElementById('username').value;
-        const p = document.getElementById('password').value;
-        if (!u || !p) return alert("Nhập đủ thông tin!");
-        const data = localStorage.getItem(this.storageKey + u);
-        if (type === 'register') {
-            if (data) return alert("Tài khoản đã tồn tại!");
-            this.player = { user: u, pass: p, lv: 1, exp: 0, gold: 0, gem: 0, race: null, baseAtk: 50, baseHp: 100, maxHp: 100 };
-            this.save();
-            alert("Đăng ký thành công!");
-        } else {
-            if (!data || JSON.parse(data).pass !== p) return alert("Sai thông tin!");
-            this.player = JSON.parse(data);
-            this.loadMonster();
-            this.render();
-        }
-    },
+        loadMonster() {
+            const m = MONSTERS[this.monsterIdx];
+            this.currentMonsterHP = m.hp;
+            document.getElementById('n-name').innerText = m.name;
+            document.getElementById('n-hp-current').innerText = this.currentMonsterHP;
+            document.getElementById('n-hp-max').innerText = m.hp;
+        },
 
-    loadMonster() {
-        const m = MONSTERS[this.monsterIdx];
-        this.currentMonsterHP = m.hp; // Reset máu quái về đầy khi load
-        this.updateMonsterUI();
-    },
+        save() {
+            localStorage.setItem(this.storageKey + this.player.user, JSON.stringify(this.player));
+        },
 
-    nextMonster() {
-        this.monsterIdx = (this.monsterIdx + 1) % MONSTERS.length;
-        this.loadMonster();
-        this.log(`Mục tiêu đổi thành: ${MONSTERS[this.monsterIdx].name}`);
-    },
-
-    updateMonsterUI() {
-        const m = MONSTERS[this.monsterIdx];
-        document.getElementById('m-name').innerText = m.name;
-        document.getElementById('m-hp-current').innerText = this.currentMonsterHP;
-        document.getElementById('m-hp-max').innerText = m.hp;
-    },
-
-    selectRace(name) {
-        this.player.race = name;
-        this.player.baseAtk = Math.floor(this.player.baseAtk * RACES[name].atkMulti);
-        this.player.baseHp = Math.floor(this.player.baseHp * RACES[name].hpMulti);
-        this.player.maxHp = this.player.baseHp;
-        this.save();
-        this.loadMonster();
-        this.render();
-    },
-
-    attack() {
-        const p = this.player;
-        const m = MONSTERS[this.monsterIdx];
-        const r = RACES[p.race];
-
-        // Trừ máu quái
-        this.currentMonsterHP -= p.baseAtk;
-
-        // Tính phản dame (40%)
-        const reflectRate = 0.4 - r.reflectReduc;
-        const reflectDmg = Math.floor(p.baseAtk * reflectRate);
-        p.baseHp -= reflectDmg;
-
-        this.log(`Bạn đánh ${m.name} -${p.baseAtk} HP. Bị phản -${reflectDmg} HP.`);
-
-        // Nếu quái chết
-        if (this.currentMonsterHP <= 0) {
-            this.log(`<span style="color:yellow">Hạ gục ${m.name}! +${m.gold} vàng, +${m.exp} EXP.</span>`);
-            p.gold += m.gold;
-            p.exp += m.exp;
-            this.currentMonsterHP = m.hp; // HỒI MÁU QUÁI NGAY LẬP TỨC
-        }
-
-        if (p.baseHp <= 0) {
-            alert("Bạn đã hy sinh!");
-            p.baseHp = p.maxHp;
-        }
-
-        if (p.exp >= p.lv * 100) {
-            p.lv++; p.exp = 0; p.gem += 2;
-            this.log(`<span style="color:cyan">Lên cấp ${p.lv}!</span>`);
-        }
-
-        this.save();
-        this.updateStats();
-        this.updateMonsterUI();
-    },
-
-    buy(i) {
-        const item = SHOP_ITEMS[i];
-        if (this.player.gold >= item.price) {
+        buy(idx) {
+            if (!this.player) return alert("Đăng nhập trước!");
+            const item = SHOP_ITEMS[idx];
+            if (this.player.gold < item.price) return alert("Không đủ tiền!");
             this.player.gold -= item.price;
-            this.player.baseAtk += item.atk;
-            this.player.maxHp += item.hp;
-            this.player.baseHp = this.player.maxHp;
+            if (item.hp) this.player.hp += item.hp;
+            if (item.atk) this.player.atk += item.atk;
             this.save();
-            this.updateStats();
-            this.log(`Mua ${item.name} thành công!`);
-        } else alert("Không đủ tiền!");
-    },
+            alert("Đã mua " + item.name);
+        },
 
-    save() { localStorage.setItem(this.storageKey + this.player.user, JSON.stringify(this.player)); },
-    
-    updateStats() {
-        document.getElementById('p-user').innerText = this.player.user;
-        document.getElementById('p-race').innerText = this.player.race;
-        document.getElementById('p-lv').innerText = this.player.lv;
-        document.getElementById('p-gold').innerText = this.player.gold;
-        document.getElementById('p-gem').innerText = this.player.gem;
-        document.getElementById('p-hp').innerText = this.player.baseHp;
-        document.getElementById('p-atk').innerText = this.player.baseAtk;
-    },
-
-    render() {
-        document.getElementById('auth-screen').classList.add('hidden');
-        if (!this.player.race) document.getElementById('race-screen').classList.remove('hidden');
-        else {
-            document.getElementById('race-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            this.updateStats();
+        selectRace(name) {
+            if (!this.player) return alert("Đăng nhập trước!");
+            this.player.race = name;
+            alert("Đã chọn tộc " + name);
+            this.save();
         }
-    },
+    };
 
-    log(msg) {
-        const l = document.getElementById('game-log');
-        l.innerHTML += `> ${msg}<br>`;
-        l.scrollTop = l.scrollHeight;
-    },
-
-    logout() { location.reload(); }
-};
-
-game.init();
-</script>
+    game.init();
+    </script>
 </body>
 </html>
